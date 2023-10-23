@@ -561,6 +561,7 @@ def settings_menu():
         'WIFI',
         'KART EKLE',
         'KART SIL',
+        'GUNCELLE',
         'SIFIRLA']
     if len(file_list) >= 6:
         total_lines = 6
@@ -593,10 +594,6 @@ def settings_menu():
                 mystring = "%02X" % i + mystring
             return mystring
         reader = MFRC522(spi_id=0, sck=2, miso=4, mosi=3, cs=1, rst=0)
-        print("")
-        print("Please place card on reader")
-        print("")
-        PreviousCard = [0]
         try:
             while True:
                 reader.init()
@@ -607,15 +604,11 @@ def settings_menu():
                     if stat == reader.OK:
                         try:
                             uids = read_uids()
-                            print(uids)
                         except Exception as e:
                             uids = {}
                             print(e)
                         if cond == 'add':
                             if reader.tohexstring(uid) in uids:
-                                print(
-                                    "card already registered",
-                                    reader.tohexstring(uid))
                                 center_text(
                                     50, "KART", arcadepix, color565(
                                         0, 255, 0))
@@ -634,9 +627,7 @@ def settings_menu():
                                 time.sleep_ms(1000)
                         elif cond == 'delete':
                             if reader.tohexstring(uid) in uids:
-                                # Silmek istediğiniz satırı veya öğeyi bulun.
                                 uids.remove(reader.tohexstring(uid))
-                                # Dosyayı güncelleyin.
                                 with open("card_lib.dat", "w") as f:
                                     for line in uids:
                                         f.write(line)
@@ -819,7 +810,13 @@ def settings_menu():
         display.clear()
         center_text(60, "WIFI KURULUMU", arcadepix, color565(0, 255, 0))
         time.sleep_ms(1000)
-        import wifimgr
+        display.clear()
+        center_text(10, "WIFI ISMI:", arcadepix, color565(0, 255, 0))
+        center_text(30, "MEKAR DEVICE", arcadepix, color565(255, 255, 255))
+        center_text(50, "SIFRE:", arcadepix, color565(0, 255, 0))
+        center_text(70, "asdfghjk", arcadepix, color565(255, 255, 255))
+        center_text(90, "IP:", arcadepix, color565(0, 255, 0))
+        center_text(110, "192.168.4.1", arcadepix, color565(255, 255, 255))
         wlan = wifimgr.get_connection()
         if network.WLAN(network.STA_IF).isconnected():
             display.clear()
@@ -847,6 +844,15 @@ def settings_menu():
             card_generator('add')
         elif filename == 'KART SIL':
             card_generator('delete')
+        elif filename== 'GUNCELLE':
+            if network.WLAN(STA_IF).isconnected():
+                center_text(60,"GUNCELLENIYOR", arcadepix,color565(255,0,0))
+                exec(open('updater.py').read())
+            else:
+                display.clear()
+                center_text(60,"WIFI", arcadepix,color565(255,0,0))
+                center_text(80,"BAGLANTISI", arcadepix,color565(255,0,0))
+                center_text(100,"YOK", arcadepix,color565(255,0,0))
     show_menu(file_list, box)
     previous_time = time.ticks_ms()
     msg_prev_time = time.ticks_ms()
