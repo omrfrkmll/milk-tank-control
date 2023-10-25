@@ -1,9 +1,16 @@
-import time,json,gc
+import time,json,gc,os
 from ssd1351 import Display, color565
 from machine import Pin, SPI, ADC
 from xglcd_font import XglcdFont
+import wifimgr
+import micropython_ota
 machine.freq(250000000)
 
+wifimgr.get_connection('first_start')
+ota_host = 'https://raw.githubusercontent.com/omrfrkmll'
+project_name = 'milk-tank-control/main'
+filenames = ['boot.py', 'main.py']
+micropython_ota.ota_update(ota_host, project_name, filenames, use_version_prefix=True , hard_reset_device=True, soft_reset_device=False, timeout=5)
 spi = SPI(1, baudrate=48000000, sck=Pin(10), mosi=Pin(11))
 display = Display(spi, dc=Pin(12), cs=Pin(13), rst=Pin(14))
 
@@ -56,7 +63,7 @@ def aboutpage():
     try:
         print("main.py---->>")
         unimport_all()
-#         exec(open('main.py').read())
+        exec(open('main.py').read())
     except Exception as e:
         print(e)
         center_text(70, "cihazi yeninden", arcadepix, color565(255, 255, 255))
@@ -131,7 +138,7 @@ def card_generator():
     except KeyboardInterrupt:
         pass
 
-if config['setup']!=True:
+if config['setup']!=True or not 'card_lib.dat' in os.listdir():
     display.clear()
     center_text(50, "ILK", arcadepix, color565(0, 255, 0))
     center_text(64, "KURULUM", arcadepix, color565(0, 255, 0))
