@@ -1,5 +1,6 @@
 # this project has been written  by ILTERAY for MEKAR company
 import time
+import os
 from time import sleep
 from struct import unpack
 import network
@@ -22,8 +23,7 @@ pin_SCK = Pin(6, Pin.OUT)
 hx711 = HX711(pin_SCK, pin_OUT)
 # ----------------#
 gc.enable()
-with open('config.json', 'r') as f:  # read the json file
-    config = json.load(f)
+
 """termistor pin tanimlama"""
 thermistor = machine.ADC(26)
 """screen spi begin"""
@@ -56,16 +56,18 @@ previous_ml = 0
 steinhart_y = 40
 weight_y = steinhart_y + 24
 liter_y = weight_y + 24
-display.contrast(config['brightness'])
+
 mixer_state = False
 temp_treshould_state = False
+blynk_icon = False
 last_toggle_time = time.ticks_ms()
 
-
+with open('config.json', 'r') as f:  # read the json file
+    config = json.load(f)
+display.contrast(config['brightness'])
 def write_config():
     with open('config.json', 'w') as f:
         json.dump(config, f)
-
 
 def center_text(y, text, font, color):
     global center, w
@@ -81,11 +83,11 @@ def draw_image(image_path, x, y, width, height):
 
 
 def home():
-    global text
+    global text,blynk_icon
     display.clear()
     if network.WLAN(network.STA_IF).isconnected():
         draw_image('assets/4.raw', 102, 0, 24, 24)  # offline icon
-    elif network.WLAN(network.STA_IF).isconnected() == False:
+    else:
         draw_image('assets/3.raw', 102, 0, 24, 24)  # online icon
     if cooler_pin.value() == 0:
         draw_image('assets/8.raw', 0, 0, 24, 24)  # cooler off icon
@@ -95,17 +97,12 @@ def home():
         draw_image('assets/10.raw', 25, 0, 24, 24)  # mixer off icon
     elif mixer_pin.value() == 1:
         draw_image('assets/6.raw', 25, 0, 24, 24)  # mixer on icon
-    if mixer_pin.value() == 0 or cooler_pin.value() == 0:
-        draw_image('assets/11.raw', 50, 0, 24, 24)  # mixer & cooler off icon
-    elif mixer_pin.value() == 1 and cooler_pin.value() == 1:
-        draw_image('assets/7.raw', 50, 0, 24, 24)  # mixer & cooler on icon
-    if config['fancond'] == 0:
-        draw_image('assets/9.raw', 75, 0, 24, 24)  # fan off icon
-    elif config['fancond'] == 1:
-        draw_image('assets/5.raw', 75, 0, 0, 24)  # fan on icon
+    if blynk_icon is True:
+        draw_image('assets/blynkicon.raw', 75, 0, 24, 24)  # blynk off icon
+    elif blynk_icon is False:
+        draw_image('assets/blynkiconno.raw', 75, 0, 24, 24)  # blynk on icon
     if config['alertcond'] == 1:
         draw_image('assets/alarm.raw', 0, 52, 24, 24)  # alert icon
-
 
 def read_uids():
     with open("card_lib.dat") as f:
@@ -225,20 +222,19 @@ def temperature():
                           5, steinhart_y +
                           10, "C", arcadepix, color565(255, 255, 255))
         previous_C = unispace.measure_text(str(round(steinhart, 1)))
+        if network.WLAN(network.STA_IF).isconnected() and 'blynk_code.dat' in os.listdir():
+            try:
+                blynk.virtual_write(5, steinhart)
+                if steinhart > config['cooler']['tempmax']:
+                    blynk.log_event("high_temperature")
+                elif steinhart < config['cooler']['tempmin']:
+                    blynk.log_event("lower_temp")
+            except Exception as e:
+                print("temperautre sync error:", e)
+        del temperature_reads
         return steinhart
     except BaseException:
         draw_message("HATA [T1]")
-    if network.WLAN(network.STA_IF).isconnected():
-        try:
-            if steinhart > config['cooler']['tempmax']:
-                blynk.log_event("high_temperature")
-            elif steinhart < config['cooler']['tempmin']:
-                blynk.log_event("lower_temp")
-            blynk.virtual_write(5, steinhart)
-        except Exception as e:
-            print("temperautre sync error:", e)
-    del temperature_reads
-
 
 def weight():
     global previous_gr, previous_ml, blynk
@@ -316,7 +312,7 @@ def weight():
             80,
             0))  # L
     previous_ml = unispace.measure_text(str(liter))
-    if network.WLAN(network.STA_IF).isconnected():
+    if network.WLAN(network.STA_IF).isconnected() and 'blynk_code.dat' in os.listdir():
         try:
             blynk.virtual_write(10, weight)
         except Exception as e:
@@ -328,10 +324,9 @@ def weight():
 
 temperature()
 
-
 def init_blynk():
     try:
-        return BlynkLib.Blynk(wifimgr.read_blynk_auth())
+        return BlynkLib.Blynk(wifimgr.read_blynk_auth(), insecure=True)
     except BaseException:
         return None
 
@@ -344,15 +339,36 @@ except Exception as e:
     draw_message("wifi baglanamdi")
 try:
     blynk = init_blynk()
-
+except:
+    pass
+try:
     @blynk.on("connected")
     def blynk_connected(ping):
+        global blynk_icon
+        blynk.virtual_write(9, config['thermistor_offset'])
+        blynk.virtual_write(0, config['cooler']['tempset'])
+        blynk.virtual_write(2, config['cooler']['tempmax'])
+        blynk.virtual_write(3, config['cooler']['tempmin'])
+        blynk.virtual_write(8, config['cooler']['temptolerance'])
+        blynk.virtual_write(6, config['mixer']['mixerwork'])
+        blynk.virtual_write(7, config['mixer']['mixerwait'])
+        if config['cooler']['coolercond']=='AKTIF':
+            blynk.virtual_write(1, 1)
+        else:
+            blynk.virtual_write(1, 0)
+        if config['mixer']['mixercond']=='AKTIF':
+            blynk.virtual_write(4, 1)
+        else:
+            blynk.virtual_write(4, 0)
+        blynk_icon = True
+        home()
         draw_message("Server Baglandi")
-
+        
     @blynk.on("disconnected")
     def blynk_disconnected():
-        draw_message("Baglanti Kesildi")
+        blynk_icon = False
         home()
+        draw_message("Baglanti Kesildi")
 
     @blynk.on("V*")
     def blynk_handle_vpins(pin, value):
@@ -452,7 +468,6 @@ def mixer_toogle(current_time):
     except Exception as e:
         print("toggle error:", e)
 
-
 def home_returner():
     try:
         gc.collect()
@@ -469,14 +484,12 @@ def mainmenureturner():
     except Exception as e:
         machine.reset()
 
-
 def blynkrun():
-    if network.WLAN(network.STA_IF).isconnected():
+    if network.WLAN(network.STA_IF).isconnected() and 'blynk_code.dat' in os.listdir():
         try:
             blynk.run()  # blynk cloud connection
         except Exception as e:
             print("blynk.run(): ", e)
-
 
 home()
 
@@ -561,7 +574,6 @@ def settings_menu():
         'WIFI',
         'KART EKLE',
         'KART SIL',
-        'GUNCELLE',
         'SIFIRLA']
     if len(file_list) >= 6:
         total_lines = 6
@@ -608,6 +620,7 @@ def settings_menu():
                             uids = {}
                             print(e)
                         if cond == 'add':
+                            print(uids)
                             if reader.tohexstring(uid) in uids:
                                 center_text(
                                     50, "KART", arcadepix, color565(
@@ -627,16 +640,17 @@ def settings_menu():
                                 time.sleep_ms(1000)
                         elif cond == 'delete':
                             if reader.tohexstring(uid) in uids:
-                                uids.remove(reader.tohexstring(uid))
-                                with open("card_lib.dat", "w") as f:
-                                    for line in uids:
-                                        f.write(line)
+                                print(uids)
+                                uids.remove(reader.tohexstring(uid).strip(","))
+                                print(uids)
+                                write_uids(uids)
                                 center_text(
                                     50, "KART", arcadepix, color565(
                                         0, 255, 0))
                                 center_text(
                                     64, "SILINDI", arcadepix, color565(
                                         0, 255, 0))
+                                del uids
                                 time.sleep_ms(1000)
                             else:
                                 center_text(
@@ -844,15 +858,6 @@ def settings_menu():
             card_generator('add')
         elif filename == 'KART SIL':
             card_generator('delete')
-        elif filename== 'GUNCELLE':
-            if network.WLAN(STA_IF).isconnected():
-                center_text(60,"GUNCELLENIYOR", arcadepix,color565(255,0,0))
-                exec(open('updater.py').read())
-            else:
-                display.clear()
-                center_text(60,"WIFI", arcadepix,color565(255,0,0))
-                center_text(80,"BAGLANTISI", arcadepix,color565(255,0,0))
-                center_text(100,"YOK", arcadepix,color565(255,0,0))
     show_menu(file_list, box)
     previous_time = time.ticks_ms()
     msg_prev_time = time.ticks_ms()
@@ -1948,11 +1953,12 @@ def main():
             if elapsed_time >= 1000:  # 1 saniye geçti
                 gc.collect()
                 if network.WLAN(network.STA_IF).isconnected():
-                    try:
-                        blynk.sync_virtual(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-                    except Exception as e:
-                        print("blynk sync wirtual: ", e)
-                        draw_message("sync. hatasi")
+                    if 'blynk_code.dat' in os.listdir():
+                        try:
+                            blynk.sync_virtual(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+                        except Exception as e:
+                            print("blynk sync wirtual: ", e)
+                            draw_message("sync. hatasi")
                     display_time()
                 temperature()
                 weight()
