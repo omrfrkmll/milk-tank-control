@@ -5,7 +5,7 @@ ota_host = 'https://raw.githubusercontent.com/omrfrkmll'
 project_name = 'milk-tank-control/main'
 filenames = ['boot.py', 'main.py']
 micropython_ota.ota_update(ota_host, project_name, filenames, use_version_prefix=True , hard_reset_device=True, soft_reset_device=False, timeout=5)
-
+#hehehhe
 import time,json,gc,os
 from ssd1351 import Display, color565
 from machine import Pin, SPI, ADC
