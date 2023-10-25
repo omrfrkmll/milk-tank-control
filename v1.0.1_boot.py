@@ -5,7 +5,10 @@ from xglcd_font import XglcdFont
 import wifimgr
 import micropython_ota
 machine.freq(250000000)
+<<<<<<< HEAD:boot.py
 
+=======
+>>>>>>> 2fa2a31ffe45190539d4c2794aeb66f95ed2ffcd:v1.0.1_boot.py
 wifimgr.get_connection('first_start')
 ota_host = 'https://raw.githubusercontent.com/omrfrkmll'
 project_name = 'milk-tank-control/main'
