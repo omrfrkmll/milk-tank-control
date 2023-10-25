@@ -1,16 +1,18 @@
-import time,json,gc,os
-from ssd1351 import Display, color565
-from machine import Pin, SPI, ADC
-from xglcd_font import XglcdFont
 import wifimgr
 import micropython_ota
-machine.freq(250000000)
-
 wifimgr.get_connection('first_start')
 ota_host = 'https://raw.githubusercontent.com/omrfrkmll'
 project_name = 'milk-tank-control/main'
 filenames = ['boot.py', 'main.py']
 micropython_ota.ota_update(ota_host, project_name, filenames, use_version_prefix=True , hard_reset_device=True, soft_reset_device=False, timeout=5)
+
+import time,json,gc,os
+from ssd1351 import Display, color565
+from machine import Pin, SPI, ADC
+from xglcd_font import XglcdFont
+machine.freq(250000000)
+
+
 spi = SPI(1, baudrate=48000000, sck=Pin(10), mosi=Pin(11))
 display = Display(spi, dc=Pin(12), cs=Pin(13), rst=Pin(14))
 
